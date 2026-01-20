@@ -85,73 +85,57 @@ def root():
 
 @app.get("/autorizar")
 def iniciar_autorizacion():
-    """Inicia el flujo OAuth de Google Calendar."""
+    """Inicia el flujo OAuth de Google Calendar usando variables de entorno."""
     global oauth_flow
+
+    client_id = os.getenv("CLIENTID")
+    client_secret = os.getenv("GOOGLE_CALENDAR_SECRET")
+
+    if not client_id or not client_secret:
+        return {"error": "CLIENTID o GOOGLE_CALENDAR_SECRET (Client Secret) no configurados en el entorno."}
+
+    # Construir la configuración del cliente para el flujo OAuth desde variables de entorno
+    client_config = {
+        "web": {
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+            "token_uri": "https://oauth2.googleapis.com/token",
+            "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+            "redirect_uris": [f"{BASE_URL}/oauth2/callback"],
+        }
+    }
     
-    if not CREDENTIALS_FILE.exists():
-        return {"error": "credentials.json no encontrado"}
+    oauth_flow = Flow.from_client_config(
+        client_config=client_config,
+        scopes=SCOPES,
+        redirect_uri=f"{BASE_URL}/oauth2/callback"
+    )
     
-        
+    auth_url, _ = oauth_flow.authorization_url(
+        access_type='offline',
+        include_granted_scopes='true',
+        prompt='consent'
+    )
     
-        oauth_flow = Flow.from_client_secrets_file(
-    
-            str(CREDENTIALS_FILE),
-    
-            scopes=SCOPES,
-    
-            redirect_uri=f"{BASE_URL}/oauth2/callback"
-    
-        )
-    
-        
-    
-        auth_url, _ = oauth_flow.authorization_url(
-    
-            access_type='offline',
-    
-            include_granted_scopes='true',
-    
-            prompt='consent'
-    
-        )
-    
-        
-    
-        return HTMLResponse(f"""
-    
-        <html>
-    
-            <head><title>Autorizar SekretariaBot</title></head>
-    
-            <body style="font-family: Arial; text-align: center; padding: 50px;">
-    
-                <h1>🔐 Autorizar Google Calendar</h1>
-    
-                <p>Haz clic para autorizar el acceso:</p>
-    
-                <a href="{auth_url}" style="
-    
-                    display: inline-block;
-    
-                    padding: 15px 30px;
-    
-                    background: #4285f4;
-    
-                    color: white;
-    
-                    text-decoration: none;
-    
-                    border-radius: 5px;
-    
-                    font-size: 18px;
-    
-                ">Autorizar con Google</a>
-    
-            </body>
-    
-        </html>
-    
-        """)
+    return HTMLResponse(f"""
+    <html>
+        <head><title>Autorizar SekretariaBot</title></head>
+        <body style="font-family: Arial; text-align: center; padding: 50px;">
+            <h1>🔐 Autorizar Google Calendar</h1>
+            <p>Haz clic para autorizar el acceso:</p>
+            <a href="{auth_url}" style="
+                display: inline-block;
+                padding: 15px 30px;
+                background: #4285f4;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                font-size: 18px;
+            ">Autorizar con Google</a>
+        </body>
+    </html>
+    """)
     
     
     

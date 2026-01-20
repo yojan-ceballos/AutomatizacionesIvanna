@@ -13,6 +13,8 @@ import uvicorn
 from dotenv import load_dotenv
 from telegram import Update
 
+from contextlib import asynccontextmanager
+
 from google.auth.transport.requests import Request as GoogleRequest
 from google_auth_oauthlib.flow import Flow
 
@@ -27,10 +29,48 @@ CREDENTIALS_FILE = PROJECT_ROOT / 'credentials.json'
 TOKEN_FILE = PROJECT_ROOT / 'token.json'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-app = FastAPI(title="SekretariaBot API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Maneja el ciclo de vida de la aplicación.
+    Inicia el bot de Telegram al arrancar y lo detiene al finalizar.
+    """
+    print("=" * 50)
+    print("🤖 SekretariaBot - Iniciando componentes")
+    print("=" * 50)
+    
+    # Configurar e iniciar bot de Telegram
+    bot_app = setup_bot()
+    if bot_app:
+        app.state.bot_app = bot_app
+        await bot_app.initialize()
+        await bot_app.updater.start_polling()
+        await bot_app.start()
+        print("✅ Bot de Telegram iniciado y escuchando mensajes.")
+    else:
+        print("❌ No se pudo iniciar el bot de Telegram.")
+
+    print("\n📡 Servidor OAuth disponible en: http://localhost:8000")
+    print("   - Para autorizar, visita: http://localhost:8000/autorizar")
+    print("=" * 50)
+    
+    yield
+    
+    # Detener bot de Telegram al finalizar
+    if bot_app:
+        print("\n" + "=" * 50)
+        print("🛑 Deteniendo el bot de Telegram...")
+        await bot_app.updater.stop()
+        await bot_app.stop()
+        await bot_app.shutdown()
+        print("✅ Bot de Telegram detenido.")
+        print("=" * 50)
+
+app = FastAPI(title="SekretariaBot API", lifespan=lifespan)
 
 # Estado global para el flujo OAuth
 oauth_flow = None
+
 
 
 @app.get("/")
@@ -126,30 +166,7 @@ def oauth_callback(request: Request):
         """)
 
 
-# Importar el setup_bot del módulo de Telegram
-from ejecucion.telegram_bot import setup_bot
 
-# ... (código existente) ...
-
-@app.on_event("startup")
-async def startup_event():
-    print("=" * 50)
-    print("🤖 SekretariaBot - Iniciando componentes")
-    print("=" * 50)
-    
-    # Iniciar bot de Telegram como tarea en segundo plano
-    print("💬 Bot de Telegram configurando e iniciando polling...")
-    bot_app = setup_bot()
-    if bot_app:
-        # Esto inicia el polling en el mismo event loop de FastAPI
-        asyncio.create_task(bot_app.run_polling(allowed_updates=Update.ALL_TYPES))
-        print("✅ Bot de Telegram iniciado y escuchando mensajes.")
-    else:
-        print("❌ No se pudo iniciar el bot de Telegram.")
-    
-    print("\n📡 Servidor OAuth: http://localhost:8000")
-    print("   - Autorizar: http://localhost:8000/autorizar")
-    print("=" * 50)
 
 if __name__ == '__main__':
     # Usamos uvicorn para correr la aplicación. El bot se iniciará en el evento 'startup'.

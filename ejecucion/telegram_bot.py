@@ -302,19 +302,19 @@ async def ejecutar_accion(intencion: str, entidades: Dict[str, Any]) -> str:
         return generar_respuesta('error', {'mensaje': str(e)})
 
 
-def main():
+def setup_bot():
     """Punto de entrada principal del bot."""
     if not TELEGRAM_AVAILABLE:
         print("❌ python-telegram-bot no está instalado")
         print("   Ejecuta: pip install python-telegram-bot")
-        return
+        return None
     
     token = os.getenv('TELEGRAM_BOT_TOKEN')
     if not token:
         print("❌ TELEGRAM_BOT_TOKEN no configurado en .env")
-        return
+        return None
     
-    print("🤖 Iniciando SekretariaBot...")
+    print("🤖 Configurando SekretariaBot...")
     
     # Crear aplicación
     app = Application.builder().token(token).build()
@@ -325,10 +325,4 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(MessageHandler(filters.VOICE, handle_voice))
     
-    # Iniciar bot
-    print("✅ Bot iniciado. Presiona Ctrl+C para detener.")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
-
-
-if __name__ == '__main__':
-    main()
+    return app

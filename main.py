@@ -5,16 +5,19 @@ Ejecuta el bot de Telegram y servidor FastAPI para OAuth.
 
 import asyncio
 import os
-import threading
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 import uvicorn
 from dotenv import load_dotenv
+from telegram import Update
 
 from google.auth.transport.requests import Request as GoogleRequest
 from google_auth_oauthlib.flow import Flow
+
+# Importar el setup_bot del módulo de Telegram
+from ejecucion.telegram_bot import setup_bot
 
 load_dotenv()
 
@@ -123,29 +126,31 @@ def oauth_callback(request: Request):
         """)
 
 
-def run_telegram_bot():
-    """Ejecuta el bot de Telegram en un hilo separado."""
-    from ejecucion.telegram_bot import main as telegram_main
-    telegram_main()
+# Importar el setup_bot del módulo de Telegram
+from ejecucion.telegram_bot import setup_bot
 
+# ... (código existente) ...
 
-def run_fastapi():
-    """Ejecuta el servidor FastAPI."""
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
-
-
-if __name__ == '__main__':
+@app.on_event("startup")
+async def startup_event():
     print("=" * 50)
-    print("🤖 SekretariaBot")
+    print("🤖 SekretariaBot - Iniciando componentes")
     print("=" * 50)
+    
+    # Iniciar bot de Telegram como tarea en segundo plano
+    print("💬 Bot de Telegram configurando e iniciando polling...")
+    bot_app = setup_bot()
+    if bot_app:
+        # Esto inicia el polling en el mismo event loop de FastAPI
+        asyncio.create_task(bot_app.run_polling(allowed_updates=Update.ALL_TYPES))
+        print("✅ Bot de Telegram iniciado y escuchando mensajes.")
+    else:
+        print("❌ No se pudo iniciar el bot de Telegram.")
+    
     print("\n📡 Servidor OAuth: http://localhost:8000")
     print("   - Autorizar: http://localhost:8000/autorizar")
-    print("\n💬 Bot de Telegram iniciando...")
     print("=" * 50)
-    
-    # Iniciar bot de Telegram en hilo separado
-    telegram_thread = threading.Thread(target=run_telegram_bot, daemon=True)
-    telegram_thread.start()
-    
-    # Iniciar servidor FastAPI (bloquea)
-    run_fastapi()
+
+if __name__ == '__main__':
+    # Usamos uvicorn para correr la aplicación. El bot se iniciará en el evento 'startup'.
+    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
